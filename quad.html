@@ -1,0 +1,242 @@
+<html>
+<head>
+	<title> QuadTree - Rust </title>
+	<link rel="stylesheet" href="spectre.min.css">
+	<link rel="stylesheet" href="spectre-exp.min.css">
+	<link rel="stylesheet" href="spectre-icons.min.css">
+	<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+	<header class="navbar">
+		<section class="navbar-section">
+
+		</section>
+		<section class="navbar-center">
+			<h2>Мысль.</h2>
+		</section>
+		<section class="navbar-section">
+
+		</section>
+	</header>
+
+	<div class="container">
+		<div class="columns">
+			<div class="column col-3"></div>
+			<div class="column col-6">
+				<img src="mainpic.png" class="img-responsive" alt="Rust Quadtree">
+
+				<h3>Создание QuadTree с помощью Rust</h3>
+
+				<div class="chipblock">
+				<div class="chip">
+					<img src="avatar.jpeg" class="avatar avatar-sm">
+					Великий Админ Ванечка
+				</div>
+				<div class="chip">
+					<img src="avatar2.png" class="avatar avatar-sm">
+					Rust
+				</div>
+				<div class="chip">
+					<figure class="avatar avatar-sm" data-initial="QT" style="background-color: #5755d9;"></figure>
+					QuadTree
+				</div>
+				<div class="chip">
+					<figure class="avatar avatar-sm" data-initial="GD" style="background-color: #5755d9;"></figure>
+					GameDev
+				</div>
+			    </div>
+
+				<div class="maintext">
+				<p>Всем привет! В этой статье мы попробуем создать <strong>Дерево Квадрантов</strong> (Quadtree) с помощью языка программирования Rust!</p>
+				<p>Сперва узнаем, что это такое?</p>
+
+				<blockquote>
+					<p><strong>Дерево квадрантов</strong> (также квадродерево, 4-дерево, англ. quadtree) — дерево, в котором у каждого внутреннего узла ровно 4 потомка. Деревья квадрантов часто используются для рекурсивного разбиения двухмерного пространства по 4 квадранта (области). Области представляют собой квадраты, прямоугольники или имеют произвольную форм</p>
+					<cite>- <a href="https://ru.wikipedia.org/wiki/Дерево_квадрантов">wikipedia</a></cite>
+				</blockquote>
+					<p>Опеределим архитектуру будущего проекта. Нам понадобится:
+						<ul>
+							<li>Структура, представляющая собой фигуры (в нашем случае простая безразмерная точка</li>
+							<li>Структура, представляющая собой отдельно взятую ноду.</li>
+							<li>Структура обертка над нодами, представляющая собой удобное api для работы с нодами</li>
+						</ul>
+					</p>
+
+					<h4>Фигуры</h4>
+
+					<p>Как уже было сказано, фигуры для нас это простые безразмерные точки в 2d пространстве, имеющие только два параметра: координаты в пространстве <mark>x, y: u32</mark> Напишем небольшой код структуры:</p>
+
+					<pre class="code" data-lang="RUST"><code>#[derive(PartialEq, Copy, Clone)]
+pub struct Point {
+	x: u32,
+	y: u32,
+}
+					</code>
+					</pre>
+					<p>И небольшую реализацию с конструктором, создающую новые точки по заданным координатам: </p>
+					<pre class="code" data-lang="RUST"><code>impl Point {
+    pub fn new(x: u32, y: u32) -> Self {
+        Point {
+            x,
+            y,
+        }
+    }
+}
+</code></pre>
+
+				<h4>Ноды</h4>
+				<p>Теперь напишем код стрктуры для ноды, но для начала выясним, что вообщем нам нужно от каждой ноды?
+					<ul>
+						<li>Иметь высоту и ширину соотвественно: <mark>width, height</mark></li>
+						<li>Иметь координаты центра ноды <mark>x, y</mark> </li>
+						<li>Иметь счетчик для подсчета объектов внутри ноды <mark>count</mark></li>
+						<li>Иметь счетчик вместимости <mark>capacity</mark>, после того как нода будет заполнена, она "поделится"</li>
+						<li>Каждая нода должна уметь "делиться", а значит иметь список ссылок на суб-ноды <mark>Vec QuadNode</mark></li>
+						<li>Иметь список обьекто (точек), которая нода хранит внутри себя <mark>Vec Point </mark></li>
+						<li>Иметь счетчик, который позволит определить уровень ноды <mark>level</mark></li>
+					</ul>
+				</p>
+
+				<p>При этом мы могли бы не создавать отдельных переменных для центра ноды, а просто делить высоту и ширину каждой ноды или субноды на два. Также, мы могли бы не создавать счетчик вместимости, а оперделить его как константу. 
+				Напишем небольшой код структуры:</p>
+				<pre class="code" data-lang="RUST"><code>pub struct QuadNode {
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    count: u8,
+    capacity: u8,
+    child: Vec&lt;Option&lt;Box&lt;QuadNode&gt;&gt;&gt;,
+    elements: Vec&lt;Point&gt;, 
+    level: u16,
+}</code></pre>
+
+				<p>И реализацию, вместе с конструктором, создающим новую ноду:  </p>
+				<pre class="code" data-lang="RUST"><code>impl QuadNode {
+    fn new(x: u32, y: u32, width: u32, height: u32, capacity: u8, level: u16) -> Self {
+        QuadNode {
+            x,
+            y,
+            width,
+            height,
+            count: 0,
+            capacity,
+            child: Vec::with_capacity(capacity as usize),
+            elements: Vec::with_capacity(capacity as usize),
+            level,
+        }
+    }</code></pre>
+    			<p>Первой нашей функцией будет функция <mark>contain</mark> которая будет возвращать <strong>true</strong>, если нода содержит точку и <strong>false</strong> если не содержит. Работа функции заключается в нахождении левых нижних координат, правых верхних и сравнения координат точки с ними. Снова небольшой код: </p>
+    			<pre class="code" data-lang="RUST"><code>fn contain(&mut self, p: &Point) -> bool {
+    // bottom left
+    let botlx = &self.x - (self.width / 2);
+    let botly = &self.y - (self.height / 2);
+    //top right
+    let toprx = &self.x + (self.width / 2);
+    let topry = &self.y + (self.height / 2);
+
+    p.x > botlx && p.x < toprx && p.y > botly && p.y < topry
+}</code></pre>
+				
+				<p>Второй нашей функцией, будет функция - <mark>split</mark>. Как только нода будет заполнена, мы разделим ее на четыре субноды, каждая имеет разный центр:</p>
+				<pre class="code" data-lang="RUST"><code>fn split(&mut self) {
+    // center
+    let x = &self.x;
+    let y = &self.y;
+    // child node width && height
+    let w = &self.width / 2;
+    let h = &self.height / 2;
+    // child node level
+    let lvl = &self.level + 1;
+
+    println!("subdivade node");
+
+    self.child.push(Some(Box::new(QuadNode::new(x - w / 2, y + h / 2, w, h, self.capacity, lvl))));
+    self.child.push(Some(Box::new(QuadNode::new(x + w / 2, y + h / 2, w, h, self.capacity, lvl))));
+    self.child.push(Some(Box::new(QuadNode::new(x + w / 2, y - h / 2, w, h, self.capacity, lvl))));
+    self.child.push(Some(Box::new(QuadNode::new(x - w / 2, y - h / 2, w, h, self.capacity, lvl))));
+}</code></pre>
+				<p>Следующей функцией будет функция вставки точки внутрь ноды - <mark>insert</mark>, она будет рекурсивной, если нода содержит субноды, то будем искать субноду содержащую точку и вставлять в нее, а также увеличивать счетчик количества точек внутри ноды. Небольшйо код:</p>
+				<pre class="code" data-lang="RUST"><code> fn insert(&mut self, p: Point) {
+        match self.child.len() {
+            0 =&gt; {
+                if self.contain(&p) {
+                    // no child
+                    if self.count >= self.capacity {
+                        // need to split
+                        self.split();
+                        self.insert(p);
+                    } else {
+                        // just push
+                        println!("insert new element");
+                        self.count += 1;
+                        self.elements.push(p);
+                    }
+                }
+            }
+            _ =&gt; {
+                // have child
+                for child in self.child.iter_mut().filter_map(Option::as_mut).map(Box::deref_mut) {
+                    child.insert(p);
+                }
+            }
+        }
+}</code></pre>
+
+				<p>Аналогичным образом напишем функцию удаления точки из ноды<mark>delete</mark></p>
+				<pre class="code" data-lang="RUST"><code>fn delete(&mut self, p: Point) {
+        match self.child.len() {
+            0 => {
+                if self.contain(&p) {
+                    self.remove(&p);
+                    self.count -= 1;
+                }
+            }
+            _ => {
+                let mut flag: bool = false;
+                for child in self.child.iter_mut().filter_map(Option::as_mut).map(Box::deref_mut) {
+                    flag = child.contain(&p);
+                }
+                if flag {
+                    // parent node count -1
+                    self.count -= 1;
+
+                    for child in self.child.iter_mut().filter_map(Option::as_mut).map(Box::deref_mut) {
+                        child.delete(p);
+                    }
+
+                    // need to un_split?
+                    if self.count < self.capacity {
+                        self.clear();
+                    }
+                }
+            }
+        }
+}</code></pre>
+				<p>Закончим работать с нодами, написав две вспомогательные функции. Одну из них вызывает метод <mark>delete</mark> эта функция удаляет элемент из вектора точек ноды <mark>remove</mark>, вторая функция <mark>clear</mark> очищает субноды и добавляет элементы в вектор точек родителя.</p>
+				<pre class="code" data-lang="RUST"><code>fn clear(&mut self) {
+
+        // add child's elements to parent node
+        for child in self.child.iter_mut().filter_map(Option::as_mut).map(Box::deref_mut) {
+            self.elements.extend(child.elements.iter().cloned()); // append?
+        }
+
+        // clear child node
+        self.child.clear();
+}
+
+fn remove(&mut self, p: &Point) {
+        // magic remove
+        let pos = self.elements.iter().position(|x| *x == *p).unwrap();
+        self.elements.remove(pos);
+}
+}// Закрывающая скобка impl</code></pre>
+			    </div>
+			</div>
+			<div class="column col-3"></div>
+		</div>
+	</div>
+
+</body>
+</html>
